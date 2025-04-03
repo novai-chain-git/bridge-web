@@ -143,7 +143,7 @@ export const ETHEREUM_CHAIN_MAINNET = {
       symbol: 'MATIC',
       decimals: 18
     },
-    rpcUrls: ['https://polygon-bor-rpc.publicnode.com/', 'https://polygon-pokt.nodies.app'],
+    rpcUrls: ['https://polygon-bor-rpc.publicnode.com', 'https://polygon-pokt.nodies.app','https://polygon.meowrpc.com'],
     blockExplorerUrls: [BASE_BSC_SCAN_URLS[ChainId.MATIC_MAINNET]],
     icon: maticIcon
   },
@@ -156,7 +156,7 @@ export const ETHEREUM_CHAIN_MAINNET = {
       symbol: 'BNB',
       decimals: 18
     },
-    rpcUrls: ['https://binance.llamarpc.com'],
+    rpcUrls: ['https://bsc.blockrazor.xyz'],
     blockExplorerUrls: [BASE_BSC_SCAN_URLS[ChainId.BSC_MAINNET]],
     icon: bnb
   }
