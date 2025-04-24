@@ -156,7 +156,7 @@ export const ETHEREUM_CHAIN_MAINNET = {
       symbol: 'BNB',
       decimals: 18
     },
-    rpcUrls: ['https://bsc.blockrazor.xyz'],
+    rpcUrls: ['https://go.getblock.io/1b31103faef44cb4b4caedfba04ac046'],
     blockExplorerUrls: [BASE_BSC_SCAN_URLS[ChainId.BSC_MAINNET]],
     icon: bnb
   }
