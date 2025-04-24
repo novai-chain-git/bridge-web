@@ -215,7 +215,7 @@ export const ETHEREUM_CHAIN_TESTNET = {
       symbol: 'tBNB',
       decimals: 18
     },
-    rpcUrls: ['https://bsc-testnet.blockpi.network/v1/rpc/public'],
+    rpcUrls: ['https://bsc-pokt.nodies.app','https://bsc-rpc.publicnode.com'],
     blockExplorerUrls: [BASE_BSC_SCAN_URLS[ChainId.BSC_TESTNET]],
     icon: bnb
   }
