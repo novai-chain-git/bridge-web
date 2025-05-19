@@ -215,7 +215,7 @@ export const ETHEREUM_CHAIN_TESTNET = {
       symbol: 'tBNB',
       decimals: 18
     },
-    rpcUrls: ['https://bsc-pokt.nodies.app','https://bsc-rpc.publicnode.com'],
+    rpcUrls: ['https://go.getblock.io/1b31103faef44cb4b4caedfba04ac046'],
     blockExplorerUrls: [BASE_BSC_SCAN_URLS[ChainId.BSC_TESTNET]],
     icon: bnb
   }
@@ -525,3 +525,4 @@ export type EthereumChain = keyof typeof ETHEREUM_CHAIN;
 export const ChainList = ChainIdList.map((item) => ETHEREUM_CHAIN[item]).filter(
   (item) => item.chainOriginalId !== BASE_CHAIN_ID
 );
+console.log(ChainList,'ChainList')

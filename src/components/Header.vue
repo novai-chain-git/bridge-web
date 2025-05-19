@@ -201,6 +201,7 @@ const against = (t) => {
 watch(
   () => account.value,
   async (newAccount) => {
+    console.log(BASE_CHAIN_ID,'BASE_CHAIN_ID')
     const rpcProvider = getRpcProviderByChain(BASE_CHAIN_ID);
     const balance = await rpcProvider.getBalance(newAccount);
     // const num = Number(toReadableAmount(balance, Decimals.USDT[BASE_CHAIN_ID])).toFixed(

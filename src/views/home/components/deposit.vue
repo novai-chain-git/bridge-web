@@ -357,6 +357,7 @@ import errorIcon from '@/components/errorIcon.vue';
 import BigNumber from 'bignumber.js';
 import TokenWebView from '@consenlabs-fe/webview';
 import tp from 'tp-js-sdk';
+import { ethers } from 'ethers';
 
 import btcIcon from '@/assets/img/home/btc.png';
 import usdtIcon from '@/assets/img/token/usdt.png';
@@ -576,15 +577,94 @@ const showConfirmBtnHandler = computed(() => {
 const onSubmitPledge = async () => {
   if (state.loading) return;
   const chainId = userStore.depositCurrency.chainOriginalId;
+  const symbol = userStore.depositCurrency.nativeCurrency.symbol;
   state.loading = true;
   const token = state.symbol;
   const toAddress = account.value;
   const tokenValue = state.number;
+  const decimals = userStore.depositCurrency.nativeCurrency.decimals;
 
   const userInputValue = fromReadableAmount(tokenValue, Decimals.USDT[chainId]);
+  console.log('asdasdasd', contractAddress, symbol);
+  //获取主币/判断当前是有对应的主币给与手续费用
+  console.log(tronBalance.value);
+  const rpcProvider = getRpcProviderByChain(chainId);
+  const balance = await rpcProvider.getBalance(toAddress);
+  const num = Number(toReadableAmount(balance, decimals));
+
+  if (num === 0) {
+  console.log(balance, 'balance');
+    state.loading = false;
+    ElMessage({
+      message: t('symbolTips', { symbol:symbol }),
+      type: 'error'
+    });
+    return;
+  }
+  const provider = getActiveLibrary();
+  const signer = await provider.getSigner();
+
+  const contract = getERC20Contract(getAddress(addresses[token], chainId), signer);
+  // 估算 gas
+  const estimatedGas = await contract.estimateGas.approve(
+    getAddress(addresses.ChainConnect, chainId),
+    userInputValue
+  );
+  // 乘以 MetaMask 安全 buffer，比如 1.3
+  const bufferedGasLimit = estimatedGas.mul(13).div(10);
+
+  const feeData = await provider.getFeeData();
+
+  let gasCost;
+  if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+    // EIP-1559 模式
+    gasCost = bufferedGasLimit.mul(feeData.maxFeePerGas);
+  } else {
+    // 旧模式
+    gasCost = bufferedGasLimit.mul(feeData.gasPrice);
+  }
+  const feeInEth = ethers.utils.formatEther(gasCost);
+  if (num < feeInEth) {
+    state.loading = false;
+    ElMessage({
+      message: t('symbolTips',{symbol:symbol}),
+      type: 'error'
+    });
+    return;
+  }
+  //   // 2. 获取当前 Gas Price
+  //   const gasPrice = await provider.getGasPrice(); // 单位：wei
+  //   // 3. 模拟 MetaMask 行为：Gas Limit 加 buffer（30%）
+  //   const gasLimitBuffered = estimatedGas.mul(130).div(100);
+  //   // 4. 计算总费用（wei）
+  //   const totalGasCost = gasLimitBuffered.mul(gasPrice);
+  //     const gasPriceInGwei = Number(ethers.utils.formatUnits(gasPrice, "gwei"));
+  //   const totalCostInEth = Number(ethers.utils.formatEther(totalGasCost));
+  //       // const formatted = ethers.utils.formatEther(totalCost);
+  // console.log(gasPrice,gasLimitBuffered,gasLimitBuffered)
+  // console.log(gasPriceInGwei,totalCostInEth)
+
+  // const contract = getERC20Contract(getAddress(addresses[token], chainId), signer);
+  // const estimatedGas = await contract.estimateGas.transfer(account.value, userInputValue);
+  // // 获取当前 gas price（单位：wei）
+  // const gasPrice = await provider.getGasPrice(); // BigNumber
+  // // 计算实际的费用（单位：wei）
+  // const totalCost = estimatedGas.mul(gasPrice); // BigNumbe
+  // console.log('Estimated Gas:', estimatedGas.toString());
+  // // 转换为 ETH/BNB 单位
+  // const formatted = ethers.utils.formatEther(totalCost);
+  // const formatteds = toReadableAmount(gasPrice,decimals);
+
+  //   console.log("预计 gas:", estimatedGas.toString());
+  // console.log("当前 gas price:", gasPrice.toString());
+  // console.log("预估主币花费:", formatted); // 例如: 0.00123 BNB
+  // console.log("预估主币花费:", formatteds); // 例如: 0.00123 BNB
+
+  // return;
   // 授权
   const approve = async (approveValue) => {
     try {
+      console.log(addresses, 'addresses', token);
       const receipt = await approveHandle(
         getAddress(addresses[token], chainId),
         getAddress(addresses.ChainConnect, chainId),
@@ -602,6 +682,7 @@ const onSubmitPledge = async () => {
       }
     }
   };
+
   // 如果是旧版USDT。需要先获取已授权代币，判断是授权代币是否满足要操作的数量 userInputValue
   // 不满足就先撤销授权，然后再授权足够的代币
   // 满足就直接下一步
@@ -1221,12 +1302,15 @@ watch(
 :deep(.el-divider--horizontal) {
   border-color: var(--border-color);
 }
+
 :deep(.el-divider__text) {
   background: var(--bg6);
 }
+
 :deep(.el-select__selection) {
   gap: 0;
 }
+
 :deep(.address_input .el-input__inner) {
   font-size: 14px !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.16);
@@ -1236,6 +1320,7 @@ watch(
   .down_arrow {
     transform: translate(-50%, calc(-50% - 5px));
   }
+
   .receive_num {
     background-image: linear-gradient(180deg, #5ac27c 0%, #b2e235 100%);
     -webkit-background-clip: text;
@@ -1251,21 +1336,25 @@ watch(
       font-size: 13px !important;
     }
   }
+
   .value-num {
     :deep(.el-input__inner) {
       font-size: 24px;
     }
   }
 }
+
 .value-wrap {
   :deep(.el-input__wrapper) {
     border-radius: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.16);
   }
+
   :deep(.el-input__inner) {
     font-size: 14px;
     color: #fff;
     font-family: 'OutfitMedium';
+
     &::-webkit-inner-spin-button {
       display: none !important;
       -webkit-appearance: none;
@@ -1278,9 +1367,11 @@ watch(
     font-size: 28px;
     color: #fff;
     font-family: 'OrbitronBold';
+
     &::placeholder {
       font-size: 14px;
     }
+
     &::-webkit-inner-spin-button {
       display: none !important;
       -webkit-appearance: none;
@@ -1329,13 +1420,16 @@ watch(
   margin-right: 10px;
   vertical-align: middle;
 }
+
 :deep(.no_usdt_curr) {
   cursor: not-allowed;
   background: none;
+
   &::hover {
     background: none;
   }
 }
+
 :deep(.el-dropdown-menu__item:not(.is-disabled):focus) {
   background: none;
 }
@@ -1347,6 +1441,7 @@ watch(
     }
   }
 }
+
 :deep(.error_tips_two) {
   .el-form-item__content {
     .el-form-item__error {

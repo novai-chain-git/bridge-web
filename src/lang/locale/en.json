@@ -95,6 +95,7 @@
   "Withdrawal successful": "Withdrawal successfu",
   "Rejected": "Rejected",
   "Deposit successful": "Deposit successful",
+  "symbolTips": "Insufficient {symbol} quantity",
   "In deposits": "In deposits",
   "Deposit failed": "Deposit failed",
   "successful": "successful",
