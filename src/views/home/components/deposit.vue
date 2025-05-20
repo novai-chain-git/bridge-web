@@ -342,7 +342,8 @@ import {
   getTonUsdtBalance,
   isTonAddress,
   getSolanaBalance,
-  handleSolanaTransFer
+  handleSolanaTransFer,
+  trc20Abi
 } from '@/web3-sdk';
 import { computed, onMounted, reactive, ref, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -470,9 +471,9 @@ const changeNum = (val) => {
       state.number = Number(getBalance.value);
     }
   } else if (isTron.value) {
-    if (Number(val) > Number(tronBalance.value)) {
-      state.number = Number(tronBalance.value);
-    }
+    // if (Number(val) > Number(tronBalance.value)) {
+    //   state.number = Number(tronBalance.value);
+    // }
   } else if (isTon.value) {
     if (Number(val) > Number(tonUsdtBalance.value)) {
       state.number = Number(tonUsdtBalance.value);
@@ -593,10 +594,9 @@ const onSubmitPledge = async () => {
   const num = Number(toReadableAmount(balance, decimals));
 
   if (num === 0) {
-  console.log(balance, 'balance');
     state.loading = false;
     ElMessage({
-      message: t('symbolTips', { symbol:symbol }),
+      message: t('symbolTips', { symbol: symbol }),
       type: 'error'
     });
     return;
@@ -627,7 +627,7 @@ const onSubmitPledge = async () => {
   if (num < feeInEth) {
     state.loading = false;
     ElMessage({
-      message: t('symbolTips',{symbol:symbol}),
+      message: t('symbolTips', { symbol: symbol }),
       type: 'error'
     });
     return;
@@ -720,7 +720,6 @@ const onSubmitPledge = async () => {
   } else {
     await approve(userInputValue);
   }
-  console.log('toAddress', toAddress);
   try {
     const res = await LaunchBridgeContract.value['transformAIChain'](
       userInputValue,
@@ -730,7 +729,6 @@ const onSubmitPledge = async () => {
     );
 
     const tx = await res.wait();
-    console.log('res：', res, tx);
 
     fetchHandle(state.symbol);
     ElMessage({
@@ -740,7 +738,6 @@ const onSubmitPledge = async () => {
 
     symbolChange();
   } catch (error) {
-    console.log('失败：', { error });
     if (error.code === 'ACTION_REJECTED') {
       return;
     } else if ([ChainId.BSC_TESTNET, ChainId.BSC_MAINNET].includes(chainId)) {
@@ -910,7 +907,7 @@ const tronBalance = ref(0);
 const tronBalanceLoading = ref(false);
 // 获取波场余额
 const getTronBalance = async (account) => {
-  console.log('获取波场余额');
+  console.log('获取波场余额', account, contractAddress);
   const tronUsdt = useTronUsdtContract(contractAddress);
   tronBalanceLoading.value = true;
 
@@ -968,16 +965,152 @@ const balanceHandler = (symbol) => {
   }
 };
 
+async function checkBeforeNsdtTransfer(usdtAddress, toAddress, amount) {
+  const tronWeb = window.tronWeb;
+  if (!tronWeb || !tronWeb.defaultAddress?.base58) {
+    throw new Error('TronLink 未连接');
+  }
+
+  const fromAddress = tronWeb.defaultAddress.base58;
+
+  // 获取账户 TRX 余额（单位是 sun）
+  const balanceInSun = await tronWeb.trx.getBalance(fromAddress);
+  const trxBalance = tronWeb.fromSun(balanceInSun);
+  console.log('✅ 当前 TRX 余额:', trxBalance, balanceInSun);
+  // 获取资源信息
+  const resources = await tronWeb.trx.getAccountResources(fromAddress);
+  const energyAvailable = (resources.EnergyLimit || 0) - (resources.EnergyUsed || 0);
+
+  const energy = resources.EnergyRemaining || 0;
+  const bandwidth = resources.freeNetRemaining || 0;
+  console.log(resources, 'resources');
+  console.log(energyAvailable, 'energyAvailable');
+  console.log('Energy 可用:', energy);
+  console.log('带宽可用:', bandwidth);
+  const options = {
+    // feeLimit: 10_000_000,
+    callValue: 0,
+    feeLimit: 1000000000,
+    shouldPollResponse: true
+    // shouldPollResponse: false
+  };
+  const parameter = [
+    { type: 'address', value: toAddress },
+    { type: 'uint256', value: amount }
+  ];
+  const functionSelector = 'transfer(address,uint256)';
+  console.log(usdtAddress.value, toAddress, fromAddress, 'usdtAddress');
+  try {
+    const response = await window.tronWeb.transactionBuilder.triggerSmartContract(
+      tronWeb.address.toHex(usdtAddress.value),
+      functionSelector,
+      options,
+      parameter,
+      tronWeb.address.toHex(fromAddress)
+    );
+    console.log(response, 'response');
+    if (!response.result || !response.result.result) {
+      throw new Error('模拟调用失败');
+    }
+
+    // 2. 获取能量和带宽消耗
+    const energyUsed = response.energy_used || 0;
+    const bandwidthUsed = response.transaction.raw_data_size || 0;
+
+    // 3. 查询账户信息获取免费带宽剩余额度
+    const accountInfo = await tronWeb.trx.getAccount(fromAddress);
+    const freeBandwidth = accountInfo.free_net_limit || 0;
+    const freeBandwidthUsed = accountInfo.free_net_used || 0;
+    const freeBandwidthLeft = freeBandwidth - freeBandwidthUsed;
+    console.log(accountInfo, 'accountInfo');
+    // 4. 计算需要付费的带宽
+    const paidBandwidth = Math.max(0, bandwidthUsed - freeBandwidthLeft);
+
+    // 5. 计算手续费（单位：SUN，1 SUN = 1e-6 TRX）
+    const energyPriceSun = 1;
+    const bandwidthPriceSun = 1;
+    const totalFeeSun = energyUsed * energyPriceSun + paidBandwidth * bandwidthPriceSun;
+
+    // 6. 转为 TRX
+    const totalFeeTrx = totalFeeSun / 1e6;
+    //const usdtContract = await tronWeb.contract().at(usdtAddress);
+    //  const contract = useTronUsdtContract(usdtAddress);
+    // console.log('contract:', contract);
+    //     let energyUsed = 0;
+
+    //     const result = await contract.value.transfer(toAddress, amount)
+    //       .send({ from: fromAddress, shouldPollResponse: false });
+
+    //     // send 成功时，Tron 并不会直接返回 energy 用量，所以我们用 estimateEnergy 方法（见下面）
+    //     // 但实际上 TronLink 钱包内部会预估大约 15,000 - 50,000 Energy 之间
+    //     energyUsed = 15000; // 自定义预估
+  } catch (err) {
+    console.warn('Dry-run 转账失败，可能是资源不足或额度问题:', err);
+    return { ok: false, reason: '模拟转账失败：' + err.message };
+  }
+  //   // 实例化 NSDT 合约
+  //  // const contract = await tronWeb.contract().at(usdtAddress);
+  //    const contract = useTronUsdtContract(nsdtAddress);
+  //   console.log(contract,'contract')
+  //   // 构造金额（假设 NSDT 有 6 位小数）
+  //  // const rawAmount = tronWeb.toBigNumber(amount * 1e6);
+
+  //   // 预估能量消耗
+  //   const estimatedEnergy = await contract.value.transfer(toAddress, amount).estimateEnergy();
+  //   console.log(estimatedEnergy,'estimatedEnergy')
+
+  //   // 估算 Energy 不足时所需的 TRX （1 Energy ≈ 420 sun）
+  //   const energyShort = Math.max(estimatedEnergy - energyAvailable, 0);
+  //   const trxRequired = energyShort * 420;
+
+  //   // 判断是否满足
+  //   const canProceed = energyShort === 0 || trxBalance >= trxRequired;
+
+  //   console.log(trxBalance,'trxBalance',trxRequired,'trxRequired',energyShort,"energyShort")
+  return {
+    energyUsed,
+    bandwidthUsed,
+    paidBandwidth,
+    totalFeeSun,
+    totalFeeTrx: totalFeeTrx.toFixed(6)
+    // fromAddress,
+    // toAddress,
+    // amount,
+    // trxBalanceSun: trxBalance,
+    // trxBalance: trxBalance / 1e6,
+    // energyAvailable,
+    // estimatedEnergy,
+    // energyShort,
+    // trxRequiredSun: trxRequired,
+    // trxRequired: trxRequired / 1e6,
+    // canProceed,
+    // reason: canProceed ? '满足交易条件' : 'Energy 不足，且 TRX 不足以支付手续费'
+  };
+}
+
 // 波场转账
 async function tronTransFer() {
   try {
     if (state.loading) return;
     const chainId = userStore.depositCurrency.chainOriginalId;
+    const symbol = userStore.depositCurrency.nativeCurrency.symbol;
     const token = state.symbol;
     const toAddress = state.address;
     const tokenValue = state.number;
     const tronAddress = tronWebState.account.value;
     state.loading = true;
+
+    const tronWeb = window.tronWeb;
+    const balanceInSun = await tronWeb.trx.getBalance(tronAddress);
+    const trxBalance = tronWeb.fromSun(balanceInSun);
+    if (trxBalance == 0) {
+      state.loading = false;
+      ElMessage({
+        message: t('symbolTips', { symbol: symbol }),
+        type: 'error'
+      });
+      return;
+    }
     const res = await contractReceiveAddressApi({
       chainId: chainId,
       token
@@ -988,6 +1121,14 @@ async function tronTransFer() {
         Decimals.USDT[userStore.depositCurrency.chainOriginalId]
       );
       console.log('userInputValue', userInputValue);
+      //   const tronTransferRes = await checkBeforeNsdtTransfer(
+      //     contractAddress,
+      //     res.data,
+      //     userInputValue // 转账 100 NSDT
+      //   );
+      //   console.log(tronTransferRes,'result')
+      //  return;
+
       // 波场合约
       const tronUsdtContract = useTronUsdtContract(contractAddress);
       const receipt = await tronUsdtContract.value.transfer(res.data, userInputValue).send();
@@ -1005,6 +1146,7 @@ async function tronTransFer() {
       symbolChange();
     }
   } catch (error) {
+    console.log('error', error);
   } finally {
     state.loading = false;
   }
@@ -1029,6 +1171,7 @@ const tronSubmit = async (formEl) => {
   //     return connectWallet();
   //   }
   // }
+
   formEl.validate((valid) => {
     if (valid) {
       tronTransFer();

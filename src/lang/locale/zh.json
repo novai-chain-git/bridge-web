@@ -96,7 +96,7 @@
   "Withdrawal successful": "提现成功",
   "Rejected": "已驳回",
   "Deposit successful": "存款成功",
-  "symbolTips": "{symbol} 数量不足",
+  "symbolTips": "您的账户中没有足够的 {symbol} 来支付网络费用 ",
   "In deposits": "存款中",
   "Deposit failed": "存款失败",
   "successful": "成功",
