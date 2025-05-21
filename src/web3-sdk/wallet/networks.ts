@@ -139,8 +139,8 @@ export const ETHEREUM_CHAIN_MAINNET = {
     chainOriginalId: ChainId.MATIC_MAINNET,
     chainName: 'Polygon',
     nativeCurrency: {
-      name: 'MATIC',
-      symbol: 'MATIC',
+      name: 'POL',
+      symbol: 'POL',
       decimals: 18
     },
     rpcUrls: ['https://polygon-bor-rpc.publicnode.com', 'https://polygon-pokt.nodies.app','https://polygon.meowrpc.com'],
@@ -195,8 +195,8 @@ export const ETHEREUM_CHAIN_TESTNET = {
     chainOriginalId: ChainId.MATIC_TESTNET,
     chainName: 'Polygon',
     nativeCurrency: {
-      name: 'MATIC',
-      symbol: 'MATIC',
+      name: 'POL',
+      symbol: 'POL',
       decimals: 18
     },
     rpcUrls: [

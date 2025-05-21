@@ -371,7 +371,7 @@ const symbolChange = () => {
 };
 const changeNum = (val) => {
   if (Number(val) > Number(allBalance.max)) {
-    state.number = Number(allBalance.max);
+  //  state.number = Number(allBalance.max);
   }
 };
 
@@ -385,6 +385,18 @@ const onTransition = async () => {
   const chainId = userStore.withdrawCurrency.chainOriginalId;
   const withdrawCurrencySymbol = userStore.withdrawCurrency.nativeCurrency.symbol;
   const chainConnectAddress = getAddress(addresses['ChainConnect'], chainId);
+
+    const rpcProvider = getRpcProviderByChain(BASE_CHAIN_ID);
+  const balance = await rpcProvider.getBalance(account.value);
+  const num = Number(toReadableAmount(balance, 18));
+  if (num === 0) {
+    state.loading = false;
+    ElMessage({
+      message: t('symbolTips', { symbol: "Novai" }),
+      type: 'error'
+    });
+    return;
+  }
   // TODO:余额是否足够
   // let isBalanceSufficient = false;
   // const isAccordWithEth = [

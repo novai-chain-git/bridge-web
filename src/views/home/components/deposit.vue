@@ -593,6 +593,7 @@ const onSubmitPledge = async () => {
   const balance = await rpcProvider.getBalance(toAddress);
   const num = Number(toReadableAmount(balance, decimals));
 
+  console.log(num,'num');
   if (num === 0) {
     state.loading = false;
     ElMessage({
@@ -624,6 +625,7 @@ const onSubmitPledge = async () => {
     gasCost = bufferedGasLimit.mul(feeData.gasPrice);
   }
   const feeInEth = ethers.utils.formatEther(gasCost);
+  console.log(feeInEth,'feeInEth')
   if (num < feeInEth) {
     state.loading = false;
     ElMessage({
@@ -632,7 +634,6 @@ const onSubmitPledge = async () => {
     });
     return;
   }
-
   // 授权
   const approve = async (approveValue) => {
     try {
@@ -797,6 +798,7 @@ const btcTransFer = async () => {
       symbolChange();
     }
   } catch (error) {
+    console.log(error,'error')
   } finally {
     state.loading = false;
   }
